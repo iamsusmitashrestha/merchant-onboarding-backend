@@ -1,0 +1,18 @@
+# dependencies / build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# environment
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+# logs / OS / editors
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
