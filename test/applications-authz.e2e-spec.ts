@@ -1,6 +1,8 @@
 import request from 'supertest';
 import { ApplicationStatus } from '../src/modules/applications/enums/application-status.enum';
 import { ReviewDecision } from '../src/modules/applications/enums/review-decision.enum';
+import { RiskStatus } from '../src/modules/applications/enums/risk-status.enum';
+import { riskReviewJobId } from '../src/modules/applications/risk-review/risk-review.constants';
 import { SeedUserKey } from '../src/database/seeds/seed-users';
 import { bearer, loginAs } from './helpers/auth';
 import {
@@ -225,6 +227,68 @@ describe('authorization cannot be bypassed', () => {
       const row = await findApplication(ctx.dataSource, app.id);
       expect(row.status).toBe(ApplicationStatus.DRAFT);
       expect(row.createdById).toBe(users.sales.id);
+    });
+  });
+
+  describe('submit and risk-review retry', () => {
+    it("SALES cannot submit another SALES user's application (404), and nothing is queued", async () => {
+      const app = await createApplication(ctx.http, tokens.sales2);
+
+      await request(ctx.http)
+        .post(`/applications/${app.id}/submit`)
+        .set(bearer(tokens.sales))
+        .expect(404);
+
+      const row = await findApplication(ctx.dataSource, app.id);
+      expect(row.status).toBe(ApplicationStatus.DRAFT);
+      expect(row.submissionVersion).toBe(0);
+      expect(
+        await ctx.queue.getJob(riskReviewJobId(app.id, 1)),
+      ).toBeUndefined();
+    });
+
+    it('REVIEWER cannot submit an application (403)', async () => {
+      const app = await createApplication(ctx.http, tokens.sales);
+
+      await request(ctx.http)
+        .post(`/applications/${app.id}/submit`)
+        .set(bearer(tokens.reviewer))
+        .expect(403);
+    });
+
+    it.each<SeedUserKey>(['sales', 'reviewer'])(
+      '%s cannot retry a risk review (403), and nothing is queued',
+      async (who) => {
+        const app = await createApplication(ctx.http, tokens.sales);
+        await forceState(ctx.dataSource, app.id, {
+          status: ApplicationStatus.SUBMITTED,
+          riskStatus: RiskStatus.FAILED,
+          submissionVersion: 1,
+        });
+
+        await request(ctx.http)
+          .post(`/applications/${app.id}/risk-review/retry`)
+          .set(bearer(tokens[who]))
+          .expect(403);
+
+        const row = await findApplication(ctx.dataSource, app.id);
+        expect(row.riskStatus).toBe(RiskStatus.FAILED);
+        expect(
+          await ctx.queue.getJob(riskReviewJobId(app.id, 1)),
+        ).toBeUndefined();
+      },
+    );
+
+    it('REVIEWER can read an application once it has left DRAFT', async () => {
+      const app = await createApplication(ctx.http, tokens.sales);
+      await forceState(ctx.dataSource, app.id, {
+        status: ApplicationStatus.SUBMITTED,
+      });
+
+      await request(ctx.http)
+        .get(`/applications/${app.id}`)
+        .set(bearer(tokens.reviewer))
+        .expect(200);
     });
   });
 });

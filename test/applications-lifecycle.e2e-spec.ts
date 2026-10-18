@@ -4,12 +4,15 @@ import { SeedUserKey } from '../src/database/seeds/seed-users';
 import { ApplicationStatus } from '../src/modules/applications/enums/application-status.enum';
 import { ReviewDecision } from '../src/modules/applications/enums/review-decision.enum';
 import { RiskStatus } from '../src/modules/applications/enums/risk-status.enum';
+import { RiskAssessment } from '../src/modules/applications/risk-review/risk-assessment.entity';
 import { bearer, loginAs } from './helpers/auth';
 import {
+  ApplicationBody,
   applicationInput,
   createApplication,
   findApplication,
   forceState,
+  waitFor,
 } from './helpers/fixtures';
 import {
   createTestApp,
@@ -339,5 +342,147 @@ describe('application lifecycle (e2e)', () => {
           .expect(400);
       },
     );
+  });
+
+  describe('full flow through the real submit and risk review', () => {
+    const as = (who: SeedUserKey) => bearer(tokens[who]);
+
+    async function waitForStatus(id: string, status: ApplicationStatus) {
+      return waitFor(
+        async () =>
+          (
+            await request(ctx.http)
+              .get(`/applications/${id}`)
+              .set(as('admin'))
+              .expect(200)
+          ).body as ApplicationBody,
+        (app) => app.status === status,
+      );
+    }
+
+    it('draft → submit → risk review → request info → edit → resubmit → approve, then terminal', async () => {
+      const draft = await createApplication(ctx.http, tokens.sales);
+
+      const edited = await request(ctx.http)
+        .patch(`/applications/${draft.id}`)
+        .set(as('sales'))
+        .send({
+          businessName: 'Acme Flow Shop',
+          expectedVersion: draft.version,
+        })
+        .expect(200);
+
+      const submitted = await request(ctx.http)
+        .post(`/applications/${draft.id}/submit`)
+        .set(as('sales'))
+        .expect(200);
+      expect(submitted.body).toMatchObject({
+        status: ApplicationStatus.SUBMITTED,
+        riskStatus: RiskStatus.PENDING,
+        submissionVersion: 1,
+      });
+
+      await request(ctx.http)
+        .patch(`/applications/${draft.id}`)
+        .set(as('sales'))
+        .send({
+          businessName: 'Too late',
+          expectedVersion: submitted.body.version,
+        })
+        .expect(409);
+
+      await waitForStatus(draft.id, ApplicationStatus.IN_REVIEW);
+
+      await request(ctx.http)
+        .post(`/applications/${draft.id}/assign`)
+        .set(as('admin'))
+        .send({ reviewerId: users.reviewer.id })
+        .expect(200);
+
+      const infoRequested = await request(ctx.http)
+        .post(`/applications/${draft.id}/decision`)
+        .set(as('reviewer'))
+        .send({
+          decision: ReviewDecision.REQUEST_INFO,
+          reason: 'Need a direct phone line',
+        })
+        .expect(200);
+      expect(infoRequested.body.status).toBe(ApplicationStatus.INFO_REQUESTED);
+
+      await request(ctx.http)
+        .patch(`/applications/${draft.id}`)
+        .set(as('sales'))
+        .send({
+          ownerPhone: '+1 555 0199',
+          expectedVersion: infoRequested.body.version,
+        })
+        .expect(200);
+
+      const resubmitted = await request(ctx.http)
+        .post(`/applications/${draft.id}/submit`)
+        .set(as('sales'))
+        .expect(200);
+      expect(resubmitted.body.submissionVersion).toBe(2);
+
+      await waitForStatus(draft.id, ApplicationStatus.IN_REVIEW);
+      const assessments = await ctx.dataSource
+        .getRepository(RiskAssessment)
+        .find({
+          where: { applicationId: draft.id },
+          order: { submissionVersion: 'ASC' },
+        });
+      expect(assessments.map((a) => a.submissionVersion)).toEqual([1, 2]);
+
+      const approved = await request(ctx.http)
+        .post(`/applications/${draft.id}/decision`)
+        .set(as('reviewer'))
+        .send({
+          decision: ReviewDecision.APPROVE,
+          reason: 'KYB clear after update',
+        })
+        .expect(200);
+      expect(approved.body).toMatchObject({
+        status: ApplicationStatus.APPROVED,
+        businessName: edited.body.businessName,
+        assignedReviewerId: users.reviewer.id,
+      });
+      expect(approved.body.decidedAt).not.toBeNull();
+
+      // APPROVED is terminal: every further action is a 409.
+      await request(ctx.http)
+        .post(`/applications/${draft.id}/submit`)
+        .set(as('sales'))
+        .expect(409);
+      await request(ctx.http)
+        .patch(`/applications/${draft.id}`)
+        .set(as('sales'))
+        .send({
+          businessName: 'After approval',
+          expectedVersion: approved.body.version,
+        })
+        .expect(409);
+      await request(ctx.http)
+        .post(`/applications/${draft.id}/assign`)
+        .set(as('admin'))
+        .send({ reviewerId: users.reviewer2.id })
+        .expect(409);
+      await request(ctx.http)
+        .post(`/applications/${draft.id}/decision`)
+        .set(as('reviewer'))
+        .send({ decision: ReviewDecision.REJECT, reason: 'Changed my mind' })
+        .expect(409);
+    });
+
+    it('rejects resubmitting while the risk review is still running (409)', async () => {
+      const app = await createApplication(ctx.http, tokens.sales);
+      await request(ctx.http)
+        .post(`/applications/${app.id}/submit`)
+        .set(as('sales'))
+        .expect(200);
+      await request(ctx.http)
+        .post(`/applications/${app.id}/submit`)
+        .set(as('admin'))
+        .expect(409);
+    });
   });
 });
