@@ -1,3 +1,4 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -10,6 +11,7 @@ import {
   NodeEnv,
   validateEnv,
 } from './config/env.validation';
+import { redisConnection } from './config/redis.config';
 import { buildDataSourceOptions } from './database/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard, RolesGuard } from './modules/auth/guards';
@@ -55,6 +57,16 @@ import { UsersModule } from './modules/users/users.module';
           DB_PASSWORD: config.get('DB_PASSWORD', { infer: true }),
           DB_NAME: config.get('DB_NAME', { infer: true }),
         }),
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<EnvironmentVariables, true>) => ({
+        connection: {
+          ...redisConnection(config),
+          maxRetriesPerRequest: null, // required by BullMQ workers
+        },
+        prefix: config.get('BULL_PREFIX', { infer: true }),
+      }),
     }),
     UsersModule,
     AuthModule,

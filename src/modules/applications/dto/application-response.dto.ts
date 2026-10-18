@@ -3,7 +3,7 @@ import { maskLast4 } from '../../../common/redaction/redaction';
 import { MerchantApplication } from '../entities/merchant-application.entity';
 import { ApplicationStatus } from '../enums/application-status.enum';
 import { BusinessType } from '../enums/business-type.enum';
-import { RiskLevel } from '../enums/risk-level.enum';
+import { RiskLevel } from '../../risk/risk-level.enum';
 import { RiskStatus } from '../enums/risk-status.enum';
 
 export class ApplicationResponseDto {

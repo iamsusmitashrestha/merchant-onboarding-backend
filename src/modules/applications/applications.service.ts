@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager, SelectQueryBuilder } from 'typeorm';
 import {
   ConflictError,
   InvalidRequestError,
   NotFoundError,
+  ServiceUnavailableError,
 } from '../../common/errors';
 import { AuditAction } from '../audit/audit-action.enum';
 import { AuditEntityType } from '../audit/audit-entity-type.enum';
@@ -18,6 +19,7 @@ import {
 import {
   actionForDecision,
   ApplicationAction,
+  assertCanRetryRiskReview,
   isFinalStatus,
   nextStatus,
 } from './domain/application-state-machine';
@@ -29,6 +31,7 @@ import { UpdateApplicationDto } from './dto/update-application.dto';
 import { MerchantApplication } from './entities/merchant-application.entity';
 import { ApplicationStatus } from './enums/application-status.enum';
 import { RiskStatus } from './enums/risk-status.enum';
+import { RiskReviewQueue } from './risk-review/risk-review.queue';
 
 const EDITABLE_FIELDS = [
   'businessName',
@@ -46,10 +49,13 @@ const EDITABLE_FIELDS = [
 
 @Injectable()
 export class ApplicationsService {
+  private readonly logger = new Logger(ApplicationsService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly users: UsersService,
+    private readonly riskQueue: RiskReviewQueue,
   ) {}
 
   create(
@@ -143,6 +149,62 @@ export class ApplicationsService {
     });
   }
 
+  async submit(user: AuthUser, id: string): Promise<MerchantApplication> {
+    const app = await this.dataSource.transaction(async (em) => {
+      const app = await this.lockForUpdate(em, user, id);
+      app.status = nextStatus(app.status, ApplicationAction.SUBMIT);
+      app.submissionVersion += 1;
+      app.riskStatus = RiskStatus.PENDING;
+      app.riskLevel = null;
+      app.submittedAt = new Date();
+      await em.save(app);
+      await this.audit.record(em, {
+        actor: user,
+        action: AuditAction.APPLICATION_SUBMITTED,
+        entityType: AuditEntityType.MERCHANT_APPLICATION,
+        entityId: app.id,
+        metadata: { submissionVersion: app.submissionVersion },
+      });
+      return app;
+    });
+
+    // After the commit, so the worker always sees the SUBMITTED row (ADR 0004).
+    await this.afterCommit(app, () =>
+      this.riskQueue.enqueue(app.id, app.submissionVersion),
+    );
+    return app;
+  }
+
+  async retryRiskReview(
+    user: AuthUser,
+    id: string,
+  ): Promise<MerchantApplication> {
+    const app = await this.dataSource.transaction(async (em) => {
+      const app = await this.lockForUpdate(em, user, id);
+      assertCanRetryRiskReview(app.status, app.riskStatus);
+
+      const previousRiskStatus = app.riskStatus;
+      app.riskStatus = RiskStatus.PENDING;
+      await em.save(app);
+      await this.audit.record(em, {
+        actor: user,
+        action: AuditAction.RISK_REVIEW_RETRIED,
+        entityType: AuditEntityType.MERCHANT_APPLICATION,
+        entityId: app.id,
+        metadata: {
+          submissionVersion: app.submissionVersion,
+          previousRiskStatus,
+        },
+      });
+      return app;
+    });
+
+    await this.afterCommit(app, () =>
+      this.riskQueue.retry(app.id, app.submissionVersion),
+    );
+    return app;
+  }
+
   async assign(
     user: AuthUser,
     id: string,
@@ -214,6 +276,24 @@ export class ApplicationsService {
       qb.andWhere('app.status <> :draft', { draft: ApplicationStatus.DRAFT });
     }
     return qb;
+  }
+
+  // The change is already committed; if the queue is down, say so honestly
+  // (503) and leave the app PENDING for an ADMIN retry (ADR 0009).
+  private async afterCommit(
+    app: MerchantApplication,
+    enqueue: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await enqueue();
+    } catch (err) {
+      this.logger.error(
+        `Could not queue risk review for application ${app.id} v${app.submissionVersion}: ${String(err)}`,
+      );
+      throw new ServiceUnavailableError(
+        'The application was saved, but its risk review could not be queued. An admin can retry it.',
+      );
+    }
   }
 
   private async lockForUpdate(

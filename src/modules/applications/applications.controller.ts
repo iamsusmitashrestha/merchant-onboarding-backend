@@ -17,6 +17,7 @@ import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -94,6 +95,48 @@ export class ApplicationsController {
     @Body() dto: UpdateApplicationDto,
   ): Promise<ApplicationResponseDto> {
     const app = await this.applications.update(user, id, dto);
+    return ApplicationResponseDto.fromEntity(app);
+  }
+
+  @Post(':id/submit')
+  @HttpCode(200)
+  @Roles(UserRole.ADMIN, UserRole.SALES)
+  @ApiOkResponse({
+    type: ApplicationResponseDto,
+    description:
+      'SUBMITTED with riskStatus PENDING; the risk review runs in the background',
+  })
+  @ApiForbiddenResponse({ description: 'Role not allowed' })
+  @ApiNotFoundResponse({ description: 'Not found or not visible to you' })
+  @ApiConflictResponse({ description: 'Not submittable in its current status' })
+  @ApiServiceUnavailableResponse({
+    description:
+      'Saved, but the risk review could not be queued (ADMIN can retry)',
+  })
+  async submit(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ApplicationResponseDto> {
+    const app = await this.applications.submit(user, id);
+    return ApplicationResponseDto.fromEntity(app);
+  }
+
+  @Post(':id/risk-review/retry')
+  @HttpCode(200)
+  @Roles(UserRole.ADMIN)
+  @ApiOkResponse({ type: ApplicationResponseDto })
+  @ApiForbiddenResponse({ description: 'Only ADMIN can retry a risk review' })
+  @ApiNotFoundResponse({ description: 'Application not found' })
+  @ApiConflictResponse({
+    description:
+      'Only SUBMITTED applications with riskStatus FAILED or PENDING',
+  })
+  @ApiServiceUnavailableResponse({ description: 'The queue is unavailable' })
+  async retryRiskReview(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ApplicationResponseDto> {
+    const app = await this.applications.retryRiskReview(user, id);
     return ApplicationResponseDto.fromEntity(app);
   }
 

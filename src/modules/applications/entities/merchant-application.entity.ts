@@ -13,7 +13,7 @@ import { bigintTransformer } from '../../../common/bigint.transformer';
 import { User } from '../../users/user.entity';
 import { ApplicationStatus } from '../enums/application-status.enum';
 import { BusinessType } from '../enums/business-type.enum';
-import { RiskLevel } from '../enums/risk-level.enum';
+import { RiskLevel } from '../../risk/risk-level.enum';
 import { RiskStatus } from '../enums/risk-status.enum';
 
 @Entity({ name: 'merchant_applications' })
