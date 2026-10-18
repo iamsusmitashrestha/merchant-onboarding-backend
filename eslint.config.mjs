@@ -33,6 +33,17 @@ export default tseslint.config(
     },
   },
   {
+    // Supertest types response bodies as `any`; asserting on them is the point of these tests.
+    files: ['test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+    },
+  },
+  {
     // Architecture guardrail (ADR 0001): business rules stay framework-free.
     files: ['src/**/domain/**/*.ts'],
     rules: {
