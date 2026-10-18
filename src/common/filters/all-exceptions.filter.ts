@@ -14,6 +14,7 @@ import {
   InvalidRequestError,
   InvalidTransitionError,
   NotFoundError,
+  ServiceUnavailableError,
 } from '../errors';
 
 interface ErrorBody {
@@ -86,5 +87,8 @@ function domainStatus(error: DomainError): number {
   if (error instanceof InvalidTransitionError) return HttpStatus.CONFLICT;
   if (error instanceof ConflictError) return HttpStatus.CONFLICT;
   if (error instanceof InvalidRequestError) return HttpStatus.BAD_REQUEST;
+  if (error instanceof ServiceUnavailableError) {
+    return HttpStatus.SERVICE_UNAVAILABLE;
+  }
   return HttpStatus.BAD_REQUEST;
 }

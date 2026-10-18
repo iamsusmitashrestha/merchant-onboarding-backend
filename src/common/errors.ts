@@ -37,3 +37,6 @@ export class ConflictError extends DomainError {}
 
 /** The request is well-formed but refers to something invalid (e.g. assignee is not a reviewer) → 400. */
 export class InvalidRequestError extends DomainError {}
+
+/** A dependency (e.g. the queue) is unavailable; the client may retry later → 503. */
+export class ServiceUnavailableError extends DomainError {}

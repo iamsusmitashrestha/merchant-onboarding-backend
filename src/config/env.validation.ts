@@ -4,6 +4,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -76,6 +77,24 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SEED_USER_PASSWORD?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  RISK_JOB_ATTEMPTS: number = 5;
+
+  @IsInt()
+  @Min(0)
+  RISK_JOB_BACKOFF_MS: number = 2000;
+
+  @IsInt()
+  @Min(0)
+  RISK_SIM_LATENCY_MS: number = 300;
+
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  RISK_SIM_FAILURE_RATE: number = 0.2;
 }
 
 export function validateEnv(
