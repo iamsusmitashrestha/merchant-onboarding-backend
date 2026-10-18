@@ -26,9 +26,14 @@ export class InvalidTransitionError extends DomainError {
     readonly from: string,
     readonly action: string,
   ) {
-    super(`Cannot ${action} an application in status ${from}`);
+    super(
+      `Action ${action} is not allowed for an application in status ${from}`,
+    );
   }
 }
 
 /** A business-rule conflict that is not a state transition (e.g. stale version) → 409. */
 export class ConflictError extends DomainError {}
+
+/** The request is well-formed but refers to something invalid (e.g. assignee is not a reviewer) → 400. */
+export class InvalidRequestError extends DomainError {}

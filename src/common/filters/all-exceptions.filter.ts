@@ -11,6 +11,7 @@ import {
   ConflictError,
   DomainError,
   ForbiddenActionError,
+  InvalidRequestError,
   InvalidTransitionError,
   NotFoundError,
 } from '../errors';
@@ -84,5 +85,6 @@ function domainStatus(error: DomainError): number {
   if (error instanceof ForbiddenActionError) return HttpStatus.FORBIDDEN;
   if (error instanceof InvalidTransitionError) return HttpStatus.CONFLICT;
   if (error instanceof ConflictError) return HttpStatus.CONFLICT;
+  if (error instanceof InvalidRequestError) return HttpStatus.BAD_REQUEST;
   return HttpStatus.BAD_REQUEST;
 }
