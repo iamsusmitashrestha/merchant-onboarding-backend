@@ -13,6 +13,7 @@ import {
 import { buildDataSourceOptions } from './database/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard, RolesGuard } from './modules/auth/guards';
+import { ApplicationsModule } from './modules/applications/applications.module';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -58,6 +59,7 @@ import { UsersModule } from './modules/users/users.module';
     UsersModule,
     AuthModule,
     HealthModule,
+    ApplicationsModule,
   ],
   providers: [
     // Order matters: authenticate first, then check roles.
