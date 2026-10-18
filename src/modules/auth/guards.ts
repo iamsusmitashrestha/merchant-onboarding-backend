@@ -7,7 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthUser, IS_PUBLIC_KEY, ROLES_KEY } from './auth.decorators';
-import { Role } from '../users/role.enum';
+import { UserRole } from '../users/user-role.enum';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -33,7 +33,7 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const required = this.reflector.getAllAndOverride<Role[] | undefined>(
+    const required = this.reflector.getAllAndOverride<UserRole[] | undefined>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );

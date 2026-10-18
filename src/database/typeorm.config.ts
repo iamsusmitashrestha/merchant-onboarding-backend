@@ -1,10 +1,11 @@
 import { join } from 'path';
 import { DataSourceOptions } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
+import { AuditLog } from '../modules/audit/audit-log.entity';
 import { User } from '../modules/users/user.entity';
 
 /** Every entity, listed explicitly so the app, CLI and tests load the same classes. */
-export const ENTITIES = [User];
+export const ENTITIES = [User, AuditLog];
 
 interface DbEnv {
   DB_HOST: string;

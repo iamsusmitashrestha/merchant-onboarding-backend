@@ -1,15 +1,15 @@
 import { hash } from 'bcryptjs';
 import dataSource from '../data-source';
-import { Role } from '../../modules/users/role.enum';
+import { UserRole } from '../../modules/users/user-role.enum';
 import { User } from '../../modules/users/user.entity';
 
 /** Fake demo users only (example.com). Safe to run repeatedly: upserts by email. */
-export const SEED_USERS: Array<{ email: string; role: Role }> = [
-  { email: 'admin@example.com', role: Role.ADMIN },
-  { email: 'reviewer@example.com', role: Role.REVIEWER },
-  { email: 'reviewer2@example.com', role: Role.REVIEWER },
-  { email: 'sales@example.com', role: Role.SALES },
-  { email: 'sales2@example.com', role: Role.SALES },
+export const SEED_USERS: Array<{ email: string; role: UserRole }> = [
+  { email: 'admin@example.com', role: UserRole.ADMIN },
+  { email: 'reviewer@example.com', role: UserRole.REVIEWER },
+  { email: 'reviewer2@example.com', role: UserRole.REVIEWER },
+  { email: 'sales@example.com', role: UserRole.SALES },
+  { email: 'sales2@example.com', role: UserRole.SALES },
 ];
 
 async function seed(): Promise<void> {

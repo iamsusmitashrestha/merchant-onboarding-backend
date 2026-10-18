@@ -6,7 +6,7 @@ import {
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
-import { Role } from './role.enum';
+import { UserRole } from './user-role.enum';
 
 @Entity({ name: 'users' })
 @Unique('uq_users_email', ['email'])
@@ -22,8 +22,8 @@ export class User {
   @Column({ type: 'varchar', length: 100, select: false })
   passwordHash: string;
 
-  @Column({ type: 'enum', enum: Role, enumName: 'user_role_enum' })
-  role: Role;
+  @Column({ type: 'enum', enum: UserRole, enumName: 'user_role_enum' })
+  role: UserRole;
 
   /** Deactivated users are rejected even if they hold a valid token. */
   @Column({ type: 'boolean', default: true })

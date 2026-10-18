@@ -3,7 +3,7 @@ import {
   ExecutionContext,
   SetMetadata,
 } from '@nestjs/common';
-import { Role } from '../users/role.enum';
+import { UserRole } from '../users/user-role.enum';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const ROLES_KEY = 'roles';
@@ -12,13 +12,14 @@ export const ROLES_KEY = 'roles';
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 /** Restrict a route to the given roles. Checked by the global RolesGuard. */
-export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
+export const Roles = (...roles: UserRole[]) => SetMetadata(ROLES_KEY, roles);
 
 /** The authenticated user, as loaded from the DB by the JWT strategy. */
 export interface AuthUser {
   id: string;
   email: string;
-  role: Role;
+  role: UserRole;
+  requestId?: string;
 }
 
 export const CurrentUser = createParamDecorator(

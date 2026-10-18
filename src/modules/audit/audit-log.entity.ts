@@ -6,6 +6,8 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { AuditAction } from './audit-action.enum';
+import type { AuditActorRole } from './audit-actor-role.enum';
+import { AuditEntityType } from './audit-entity-type.enum';
 
 @Entity({ name: 'audit_logs' })
 @Index('idx_audit_logs_entity_type_entity_id_created_at', [
@@ -22,13 +24,13 @@ export class AuditLog {
   actorId: string | null;
 
   @Column({ type: 'varchar', length: 16 })
-  actorRole: string;
+  actorRole: AuditActorRole;
 
   @Column({ type: 'enum', enum: AuditAction, enumName: 'audit_action_enum' })
   action: AuditAction;
 
   @Column({ type: 'varchar', length: 50 })
-  entityType: string;
+  entityType: AuditEntityType;
 
   @Column({ type: 'uuid', nullable: true })
   entityId: string | null;
