@@ -2,7 +2,9 @@ import { Server } from 'http';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { MerchantApplication } from '../../src/modules/applications/entities/merchant-application.entity';
+import { ApplicationStatus } from '../../src/modules/applications/enums/application-status.enum';
 import { BusinessType } from '../../src/modules/applications/enums/business-type.enum';
+import { RiskStatus } from '../../src/modules/applications/enums/risk-status.enum';
 import { bearer } from './auth';
 
 // Fake data only.
@@ -25,8 +27,8 @@ export function applicationInput(overrides: Record<string, unknown> = {}) {
 
 export interface ApplicationBody {
   id: string;
-  status: string;
-  riskStatus: string;
+  status: ApplicationStatus;
+  riskStatus: RiskStatus;
   version: number;
   createdById: string;
   assignedReviewerId: string | null;
@@ -53,7 +55,10 @@ export async function forceState(
   dataSource: DataSource,
   id: string,
   patch: Partial<
-    Pick<MerchantApplication, 'status' | 'riskStatus' | 'assignedReviewerId'>
+    Pick<
+      MerchantApplication,
+      'status' | 'riskStatus' | 'assignedReviewerId' | 'submissionVersion'
+    >
   >,
 ): Promise<MerchantApplication> {
   const repo = dataSource.getRepository(MerchantApplication);

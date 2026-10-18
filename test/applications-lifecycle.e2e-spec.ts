@@ -13,7 +13,7 @@ import {
 } from './helpers/fixtures';
 import {
   createTestApp,
-  resetDatabase,
+  resetState,
   SeededUsers,
   seedUsers,
   TestContext,
@@ -32,7 +32,7 @@ describe('application lifecycle (e2e)', () => {
     }
   });
 
-  beforeEach(() => resetDatabase(ctx.dataSource));
+  beforeEach(() => resetState(ctx));
 
   afterAll(() => ctx.app.close());
 

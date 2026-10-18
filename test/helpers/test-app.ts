@@ -1,17 +1,21 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { hash } from 'bcryptjs';
+import { Queue } from 'bullmq';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/app.setup';
 import { SEED_USERS, SeedUserKey } from '../../src/database/seeds/seed-users';
+import { RISK_REVIEW_QUEUE } from '../../src/modules/applications/risk-review/risk-review.constants';
 import { User } from '../../src/modules/users/user.entity';
 
 export interface TestContext {
   app: INestApplication;
   http: Server;
   dataSource: DataSource;
+  queue: Queue;
 }
 
 export type SeededUsers = Record<SeedUserKey, User>;
@@ -28,12 +32,20 @@ export async function createTestApp(
 
   const dataSource = app.get(DataSource);
   await dataSource.runMigrations();
-  return { app, http: app.getHttpServer() as Server, dataSource };
+
+  // Start each test file with an empty queue (test prefix only, see .env.test).
+  const queue = app.get<Queue>(getQueueToken(RISK_REVIEW_QUEUE), {
+    strict: false,
+  });
+  await queue.obliterate({ force: true });
+
+  return { app, http: app.getHttpServer() as Server, dataSource, queue };
 }
 
-export async function resetDatabase(dataSource: DataSource): Promise<void> {
-  await dataSource.query(
-    'TRUNCATE merchant_applications, audit_logs RESTART IDENTITY CASCADE',
+// Jobs left over from a previous test find no application and are skipped as stale.
+export async function resetState(ctx: TestContext): Promise<void> {
+  await ctx.dataSource.query(
+    'TRUNCATE risk_assessments, merchant_applications, audit_logs RESTART IDENTITY CASCADE',
   );
 }
 

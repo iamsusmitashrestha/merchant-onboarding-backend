@@ -5,7 +5,7 @@ import { User } from '../src/modules/users/user.entity';
 import { bearer, loginAs, signToken, unsignedToken } from './helpers/auth';
 import {
   createTestApp,
-  resetDatabase,
+  resetState,
   SeededUsers,
   seedUsers,
   TestContext,
@@ -21,7 +21,7 @@ describe('auth (e2e)', () => {
     users = await seedUsers(ctx.dataSource);
   });
 
-  beforeEach(() => resetDatabase(ctx.dataSource));
+  beforeEach(() => resetState(ctx));
 
   afterAll(() => ctx.app.close());
 

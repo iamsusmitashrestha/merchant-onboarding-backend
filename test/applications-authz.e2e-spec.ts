@@ -11,7 +11,7 @@ import {
 } from './helpers/fixtures';
 import {
   createTestApp,
-  resetDatabase,
+  resetState,
   SeededUsers,
   seedUsers,
   TestContext,
@@ -30,7 +30,7 @@ describe('authorization cannot be bypassed', () => {
     }
   });
 
-  beforeEach(() => resetDatabase(ctx.dataSource));
+  beforeEach(() => resetState(ctx));
 
   afterAll(() => ctx.app.close());
 
