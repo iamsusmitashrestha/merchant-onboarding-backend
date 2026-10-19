@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Staying on NestJS 11 (CommonJS) on purpose; see docs/adr/0006-stack-versions.md.
+      - dependency-name: '@nestjs/*'
+        update-types: ['version-update:semver-major']

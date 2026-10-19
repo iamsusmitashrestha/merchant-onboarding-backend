@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# One group per PR (or branch), so a push and its PR don't both run. Superseded
+# PR runs are cancelled; runs on main always finish.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Actions are pinned to commit SHAs (tags can be moved); Dependabot keeps them current.
+jobs:
+  checks:
+    name: Type check, lint, build, audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check (including tests)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      # Its own job's last step, so a new advisory can't hide test results.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  test:
+    name: Unit + e2e tests, migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # TODO: move to repository Secrets/Variables (details in the script).
+      - name: Create .env and .env.test from the committed examples
+        run: scripts/ci/create-env-files.sh
+
+      - name: Start Postgres and Redis from docker-compose.yml
+        run: docker compose up -d --wait postgres redis
+
+      - run: npm ci
+
+      - name: Migrations match the entities
+        run: |
+          npm run migration:run
+          npm run typeorm -- migration:generate src/database/migrations/Drift --check
+
+      - name: Unit + e2e tests with coverage thresholds
+        run: npm run test:cov:all
+
+      - name: Upload coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  docker:
+    name: Production image build + smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # TODO: move to repository Secrets/Variables (details in the script).
+      - name: Create .env and .env.test from the committed examples
+        run: scripts/ci/create-env-files.sh
+
+      - name: Read the Node version
+        id: node
+        run: echo "version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the production image (layer cache in GitHub Actions)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: merchant-onboarding-api:local
+          build-args: NODE_VERSION=${{ steps.node.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The real deploy path: migrations, seed, then the app, in production mode.
+      - name: Start the stack from the built image
+        run: |
+          docker compose up -d --wait postgres redis
+          docker compose up -d --no-build api
+
+      - name: Smoke test /health
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3000/health; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::The api container never became healthy"
+          exit 1
+
+      - name: Container logs
+        if: ${{ failure() }}
+        run: docker compose logs api
