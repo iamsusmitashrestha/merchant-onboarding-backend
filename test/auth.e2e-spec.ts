@@ -139,7 +139,7 @@ describe('auth (e2e)', () => {
       await request(ctx.http)
         .post(`/applications/${randomUUID()}/assign`)
         .set(bearer(token))
-        .send({ reviewerId: users.reviewer.id })
+        .send({ reviewerId: users.reviewer.id, expectedVersion: 1 })
         .expect(403);
     });
   });

@@ -253,6 +253,26 @@ describe('async risk review (e2e)', () => {
       );
     });
 
+    it('two simultaneous ADMIN retries both succeed, and the review completes once', async () => {
+      provider.mode = 'transient';
+      const app = await createApplication(ctx.http, tokens.sales);
+      await submit(app.id).expect(200);
+      await waitForApplication(
+        app.id,
+        (a) => a.riskStatus === RiskStatus.FAILED,
+      );
+
+      provider.mode = 'succeed';
+      const responses = await Promise.all([retry(app.id), retry(app.id)]);
+
+      expect(responses.map((r) => r.status)).toEqual([200, 200]);
+      await waitForApplication(
+        app.id,
+        (a) => a.status === ApplicationStatus.IN_REVIEW,
+      );
+      expect(await assessmentsFor(app.id)).toHaveLength(1);
+    });
+
     it('does not retry a permanent provider error', async () => {
       provider.mode = 'permanent';
       const app = await createApplication(ctx.http, tokens.sales);

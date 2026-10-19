@@ -1,4 +1,6 @@
 import request from 'supertest';
+import { ApplicationsService } from '../src/modules/applications/applications.service';
+import { UserRole } from '../src/modules/users/user-role.enum';
 import { ApplicationStatus } from '../src/modules/applications/enums/application-status.enum';
 import { ReviewDecision } from '../src/modules/applications/enums/review-decision.enum';
 import { RiskStatus } from '../src/modules/applications/enums/risk-status.enum';
@@ -86,6 +88,25 @@ describe('authorization cannot be bypassed', () => {
       expect(res.body.meta.total).toBe(0);
     });
 
+    it('cannot widen their scope with a caller condition that contains OR', async () => {
+      const other = await createApplication(ctx.http, tokens.sales2);
+      const service = ctx.app.get(ApplicationsService);
+
+      // Same query builder every endpoint uses, plus a condition a future filter might add.
+      const rows = await service['scopedQuery'](ctx.dataSource.manager, {
+        id: users.sales.id,
+        email: users.sales.email,
+        role: UserRole.SALES,
+      })
+        .andWhere('app.id = :otherId OR app.businessName = :name', {
+          otherId: other.id,
+          name: 'Acme Test Shop',
+        })
+        .getMany();
+
+      expect(rows).toEqual([]);
+    });
+
     it('get createdById from the token, never from the body', async () => {
       const app = await createApplication(ctx.http, tokens.sales);
       expect(app.createdById).toBe(users.sales.id);
@@ -141,14 +162,14 @@ describe('authorization cannot be bypassed', () => {
       '%s cannot assign a reviewer (403)',
       async (who) => {
         const app = await createApplication(ctx.http, tokens.sales);
-        await forceState(ctx.dataSource, app.id, {
+        const { version } = await forceState(ctx.dataSource, app.id, {
           status: ApplicationStatus.SUBMITTED,
         });
 
         await request(ctx.http)
           .post(`/applications/${app.id}/assign`)
           .set(bearer(tokens[who]))
-          .send({ reviewerId: users.reviewer.id })
+          .send({ reviewerId: users.reviewer.id, expectedVersion: version })
           .expect(403);
 
         const row = await findApplication(ctx.dataSource, app.id);

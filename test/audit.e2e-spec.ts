@@ -46,12 +46,12 @@ describe('audit trail and sensitive data (e2e)', () => {
       order: { createdAt: 'ASC' },
     });
 
-  async function submitAndWaitForReview(id: string): Promise<void> {
+  async function submitAndWaitForReview(id: string): Promise<ApplicationBody> {
     await request(ctx.http)
       .post(`/applications/${id}/submit`)
       .set(as('sales'))
       .expect(200);
-    await waitFor(
+    return waitFor(
       async () =>
         (
           await request(ctx.http)
@@ -70,11 +70,14 @@ describe('audit trail and sensitive data (e2e)', () => {
       .set(as('sales'))
       .send({ businessName: 'Acme Audited', expectedVersion: app.version })
       .expect(200);
-    await submitAndWaitForReview(app.id);
+    const reviewed = await submitAndWaitForReview(app.id);
     await request(ctx.http)
       .post(`/applications/${app.id}/assign`)
       .set(as('admin'))
-      .send({ reviewerId: users.reviewer.id })
+      .send({
+        reviewerId: users.reviewer.id,
+        expectedVersion: reviewed.version,
+      })
       .expect(200);
     await request(ctx.http)
       .post(`/applications/${app.id}/decision`)

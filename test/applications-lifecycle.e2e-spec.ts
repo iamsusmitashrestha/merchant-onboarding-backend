@@ -193,44 +193,75 @@ describe('application lifecycle (e2e)', () => {
   });
 
   describe('assign reviewer', () => {
-    it('assigns an active REVIEWER while SUBMITTED', async () => {
+    const assign = (id: string, reviewerId: string, expectedVersion?: number) =>
+      request(ctx.http)
+        .post(`/applications/${id}/assign`)
+        .set(bearer(tokens.admin))
+        .send({ reviewerId, expectedVersion });
+
+    async function submittedApplication() {
       const app = await createApplication(ctx.http, tokens.sales);
-      await forceState(ctx.dataSource, app.id, {
+      return forceState(ctx.dataSource, app.id, {
         status: ApplicationStatus.SUBMITTED,
       });
+    }
 
-      const res = await request(ctx.http)
-        .post(`/applications/${app.id}/assign`)
-        .set(bearer(tokens.admin))
-        .send({ reviewerId: users.reviewer.id })
-        .expect(200);
+    it('assigns an active REVIEWER while SUBMITTED and bumps the version', async () => {
+      const app = await submittedApplication();
+
+      const res = await assign(app.id, users.reviewer.id, app.version).expect(
+        200,
+      );
 
       expect(res.body.assignedReviewerId).toBe(users.reviewer.id);
+      expect(res.body.version).toBe(app.version + 1);
     });
 
     it('cannot assign a DRAFT (409)', async () => {
       const app = await createApplication(ctx.http, tokens.sales);
-      await request(ctx.http)
-        .post(`/applications/${app.id}/assign`)
-        .set(bearer(tokens.admin))
-        .send({ reviewerId: users.reviewer.id })
-        .expect(409);
+      await assign(app.id, users.reviewer.id, app.version).expect(409);
+    });
+
+    it('requires expectedVersion (400)', async () => {
+      const app = await submittedApplication();
+      await assign(app.id, users.reviewer.id).expect(400);
+    });
+
+    it('rejects a stale expectedVersion (409) and keeps the current assignee', async () => {
+      const app = await submittedApplication();
+      await assign(app.id, users.reviewer.id, app.version).expect(200);
+
+      await assign(app.id, users.reviewer2.id, app.version).expect(409);
+
+      const row = await findApplication(ctx.dataSource, app.id);
+      expect(row.assignedReviewerId).toBe(users.reviewer.id);
+    });
+
+    it('lets only one of two simultaneous reassignments win; the other gets 409', async () => {
+      const app = await submittedApplication();
+
+      const responses = await Promise.all([
+        assign(app.id, users.reviewer.id, app.version),
+        assign(app.id, users.reviewer2.id, app.version),
+      ]);
+
+      expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);
+      const winner = responses.find((r) => r.status === 200)!;
+      const row = await findApplication(ctx.dataSource, app.id);
+      expect(row.assignedReviewerId).toBe(winner.body.assignedReviewerId);
     });
 
     it.each([
       ['a SALES user', () => users.sales.id],
       ['an unknown user', () => randomUUID()],
     ])('rejects %s as the assignee (400)', async (_label, reviewerId) => {
-      const app = await createApplication(ctx.http, tokens.sales);
-      await forceState(ctx.dataSource, app.id, {
-        status: ApplicationStatus.SUBMITTED,
-      });
+      const app = await submittedApplication();
 
-      await request(ctx.http)
-        .post(`/applications/${app.id}/assign`)
-        .set(bearer(tokens.admin))
-        .send({ reviewerId: reviewerId() })
-        .expect(400);
+      const res = await assign(app.id, reviewerId(), app.version).expect(400);
+
+      expect(res.body.message).toBe(
+        'reviewerId must belong to an active REVIEWER',
+      );
     });
   });
 
@@ -391,12 +422,18 @@ describe('application lifecycle (e2e)', () => {
         })
         .expect(409);
 
-      await waitForStatus(draft.id, ApplicationStatus.IN_REVIEW);
+      const inReview = await waitForStatus(
+        draft.id,
+        ApplicationStatus.IN_REVIEW,
+      );
 
       await request(ctx.http)
         .post(`/applications/${draft.id}/assign`)
         .set(as('admin'))
-        .send({ reviewerId: users.reviewer.id })
+        .send({
+          reviewerId: users.reviewer.id,
+          expectedVersion: inReview.version,
+        })
         .expect(200);
 
       const infoRequested = await request(ctx.http)
@@ -464,7 +501,10 @@ describe('application lifecycle (e2e)', () => {
       await request(ctx.http)
         .post(`/applications/${draft.id}/assign`)
         .set(as('admin'))
-        .send({ reviewerId: users.reviewer2.id })
+        .send({
+          reviewerId: users.reviewer2.id,
+          expectedVersion: approved.body.version,
+        })
         .expect(409);
       await request(ctx.http)
         .post(`/applications/${draft.id}/decision`)
