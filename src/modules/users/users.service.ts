@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { UserRole } from './user-role.enum';
 import { User } from './user.entity';
 
 @Injectable()
@@ -8,6 +9,13 @@ export class UsersService {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
   ) {}
+
+  list(role?: UserRole): Promise<User[]> {
+    return this.users.find({
+      where: role ? { role } : {},
+      order: { email: 'ASC' },
+    });
+  }
 
   findById(id: string): Promise<User | null> {
     return this.users.findOne({ where: { id } });

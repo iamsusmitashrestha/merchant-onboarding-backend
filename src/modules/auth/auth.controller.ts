@@ -1,12 +1,14 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { RequestId } from '../../common/request-id';
 import { Public } from './auth.decorators';
 import { AuthService } from './auth.service';
+import { LoginThrottlerGuard } from './login-throttler.guard';
 import { LoginDto, LoginResponseDto } from './dto/login.dto';
 
 @ApiTags('auth')
@@ -17,7 +19,12 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
+  @UseGuards(LoginThrottlerGuard)
   @ApiOkResponse({ type: LoginResponseDto })
+  @ApiTooManyRequestsResponse({
+    description:
+      'Too many attempts for this email from this client; retry after the window',
+  })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
   login(
     @Body() dto: LoginDto,

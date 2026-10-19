@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -15,6 +16,7 @@ export const UQ_ONE_ASSESSMENT_PER_SUBMISSION =
   'uq_risk_assessments_application_id_submission_version';
 
 @Entity({ name: 'risk_assessments' })
+@Check('chk_risk_assessments_score_range', '"score" BETWEEN 0 AND 100')
 @Unique(UQ_ONE_ASSESSMENT_PER_SUBMISSION, [
   'applicationId',
   'submissionVersion',

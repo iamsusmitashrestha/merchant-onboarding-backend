@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -17,6 +18,17 @@ import { RiskLevel } from '../../risk/risk-level.enum';
 import { RiskStatus } from '../enums/risk-status.enum';
 
 @Entity({ name: 'merchant_applications' })
+// The DTOs validate these too; the database enforces them for every writer.
+@Check(
+  'chk_merchant_applications_amounts_non_negative',
+  '"expected_monthly_volume_minor" >= 0 AND "average_ticket_minor" >= 0',
+)
+@Check('chk_merchant_applications_mcc_format', `"mcc" ~ '^[0-9]{4}$'`)
+@Check('chk_merchant_applications_currency_format', `"currency" ~ '^[A-Z]{3}$'`)
+@Check(
+  'chk_merchant_applications_submission_version_non_negative',
+  '"submission_version" >= 0',
+)
 @Index('idx_merchant_applications_created_by_id_created_at', [
   'createdById',
   'createdAt',

@@ -30,6 +30,7 @@ import {
   ApplicationResponseDto,
 } from './dto/application-response.dto';
 import { AssignReviewerDto } from './dto/assign-reviewer.dto';
+import { RiskAssessmentResponseDto } from './dto/risk-assessment-response.dto';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { ListApplicationsQueryDto } from './dto/list-applications-query.dto';
 import { RecordDecisionDto } from './dto/record-decision.dto';
@@ -78,6 +79,21 @@ export class ApplicationsController {
   ): Promise<ApplicationResponseDto> {
     const app = await this.applications.findOne(user, id);
     return ApplicationResponseDto.fromEntity(app);
+  }
+
+  @Get(':id/risk-assessments')
+  @Roles(UserRole.ADMIN, UserRole.REVIEWER)
+  @ApiOkResponse({ type: [RiskAssessmentResponseDto] })
+  @ApiForbiddenResponse({
+    description: 'Only ADMIN and REVIEWER see risk results',
+  })
+  @ApiNotFoundResponse({ description: 'Not found or not visible to you' })
+  async listRiskAssessments(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<RiskAssessmentResponseDto[]> {
+    const assessments = await this.applications.listRiskAssessments(user, id);
+    return assessments.map((a) => RiskAssessmentResponseDto.fromEntity(a));
   }
 
   @Patch(':id')

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Job, UnrecoverableError } from 'bullmq';
 import { RiskLevel } from '../../risk/risk-level.enum';
 import {
@@ -158,9 +159,14 @@ describe('RiskReviewProcessor.onFailed', () => {
   it('does not throw if marking the failure itself fails', async () => {
     const { processor, reviews } = setup(submittedApp());
     reviews.markFailed.mockRejectedValue(new Error('db down'));
+    const logError = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
 
     await expect(
       processor.onFailed(job(3, 3), new Error('timeout')),
     ).resolves.toBeUndefined();
+    expect(logError).toHaveBeenCalled();
+    logError.mockRestore();
   });
 });

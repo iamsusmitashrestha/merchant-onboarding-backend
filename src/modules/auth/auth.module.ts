@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { EnvironmentVariables } from '../../config/env.validation';
 import { AuditModule } from '../audit/audit.module';
 import { UsersModule } from '../users/users.module';
@@ -14,6 +15,18 @@ import { JwtStrategy } from './jwt.strategy';
     UsersModule,
     AuditModule,
     PassportModule,
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<EnvironmentVariables, true>) => ({
+        throttlers: [
+          {
+            limit: config.get('LOGIN_THROTTLE_LIMIT', { infer: true }),
+            ttl:
+              config.get('LOGIN_THROTTLE_TTL_SECONDS', { infer: true }) * 1000,
+          },
+        ],
+      }),
+    }),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<EnvironmentVariables, true>) => ({

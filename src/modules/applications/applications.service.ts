@@ -31,6 +31,7 @@ import { UpdateApplicationDto } from './dto/update-application.dto';
 import { MerchantApplication } from './entities/merchant-application.entity';
 import { ApplicationStatus } from './enums/application-status.enum';
 import { RiskStatus } from './enums/risk-status.enum';
+import { RiskAssessment } from './risk-review/risk-assessment.entity';
 import { RiskReviewQueue } from './risk-review/risk-review.queue';
 
 const EDITABLE_FIELDS = [
@@ -98,6 +99,19 @@ export class ApplicationsService {
         },
       });
       return app;
+    });
+  }
+
+  // One row per submission, oldest first. Goes through findOne, so the caller's
+  // scope applies: an application they can't see is a 404 here too.
+  async listRiskAssessments(
+    user: AuthUser,
+    id: string,
+  ): Promise<RiskAssessment[]> {
+    const app = await this.findOne(user, id);
+    return this.dataSource.getRepository(RiskAssessment).find({
+      where: { applicationId: app.id },
+      order: { submissionVersion: 'ASC' },
     });
   }
 
