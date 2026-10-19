@@ -14,7 +14,7 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Actions are pinned to commit SHAs (tags can be moved); Dependabot keeps them current.
+# Actions are pinned to commit SHAs (tags can be moved); the pins are updated by hand.
 jobs:
   checks:
     name: Type check, lint, build, audit
