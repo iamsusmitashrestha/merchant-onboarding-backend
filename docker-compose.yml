@@ -29,9 +29,14 @@ services:
 
   api:
     build: .
-    env_file: .env
+    image: merchant-onboarding-api:local
+    env_file:
+      - path: .env
+        required: false
     environment:
       NODE_ENV: production
+      # production mode turns Swagger off by default; keep it on for this local stack
+      SWAGGER_ENABLED: 'true'
       # inside the compose network the services listen on their default ports
       DB_HOST: postgres
       DB_PORT: 5432

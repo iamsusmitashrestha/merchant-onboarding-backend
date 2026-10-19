@@ -23,7 +23,9 @@
     "migration:generate": "npm run typeorm -- migration:generate",
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
-    "seed": "ts-node src/database/seeds/seed.ts"
+    "seed": "ts-node src/database/seeds/seed.ts",
+    "test:cov:all": "jest -c jest.coverage.config.js --coverage --runInBand",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",
@@ -34,6 +36,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.4.7",
+    "@nestjs/throttler": "^6.7.1",
     "@nestjs/typeorm": "^11.0.3",
     "bcryptjs": "^3.0.3",
     "bullmq": "^6.3.16",
