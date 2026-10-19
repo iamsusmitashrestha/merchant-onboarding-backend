@@ -31,6 +31,7 @@ services:
     build: .
     env_file: .env
     environment:
+      NODE_ENV: production
       # inside the compose network the services listen on their default ports
       DB_HOST: postgres
       DB_PORT: 5432
@@ -43,8 +44,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # migrations run explicitly before the app starts (the app itself never auto-migrates)
-    command: sh -c "npx typeorm migration:run -d dist/database/data-source.js && node dist/main"
+    # explicit, ordered startup: migrations → idempotent fake demo users → app (the app never auto-migrates)
+    command: sh -c "npx typeorm migration:run -d dist/database/data-source.js && node dist/database/seeds/seed.js && node dist/main"
 
 volumes:
   pgdata:
