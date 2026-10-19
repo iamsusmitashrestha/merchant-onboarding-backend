@@ -16,6 +16,7 @@ import {
   NotFoundError,
   ServiceUnavailableError,
 } from '../errors';
+import { REQUEST_ID_HEADER } from '../interceptors/request-id.interceptor';
 
 interface ErrorBody {
   statusCode: number;
@@ -54,6 +55,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       requestId: req.id,
     };
+    if (req.id) res.setHeader(REQUEST_ID_HEADER, req.id);
     res.status(status).json(body);
   }
 
