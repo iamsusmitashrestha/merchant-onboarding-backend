@@ -95,6 +95,18 @@ export class EnvironmentVariables {
   @Min(0)
   @Max(1)
   RISK_SIM_FAILURE_RATE: number = 0.2;
+
+  @IsInt()
+  @Min(1)
+  LOGIN_THROTTLE_LIMIT: number = 5;
+
+  @IsInt()
+  @Min(1)
+  LOGIN_THROTTLE_TTL_SECONDS: number = 60;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  SWAGGER_ENABLED?: string;
 }
 
 export function validateEnv(
