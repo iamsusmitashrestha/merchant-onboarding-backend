@@ -47,6 +47,17 @@ const EDITABLE_FIELDS = [
   'averageTicketMinor',
 ] as const satisfies ReadonlyArray<keyof CreateApplicationDto>;
 
+function assertExpectedVersion(
+  app: MerchantApplication,
+  expectedVersion: number,
+): void {
+  if (app.version !== expectedVersion) {
+    throw new ConflictError(
+      `Application was modified (current version ${app.version}); reload and retry`,
+    );
+  }
+}
+
 @Injectable()
 export class ApplicationsService {
   private readonly logger = new Logger(ApplicationsService.name);
@@ -123,11 +134,7 @@ export class ApplicationsService {
     return this.dataSource.transaction(async (em) => {
       const app = await this.lockForUpdate(em, user, id);
       nextStatus(app.status, ApplicationAction.UPDATE);
-      if (app.version !== dto.expectedVersion) {
-        throw new ConflictError(
-          `Application was modified (current version ${app.version}); reload and retry`,
-        );
-      }
+      assertExpectedVersion(app, dto.expectedVersion);
 
       const changedFields = EDITABLE_FIELDS.filter(
         (field) => dto[field] !== undefined && dto[field] !== app[field],
@@ -220,6 +227,7 @@ export class ApplicationsService {
     return this.dataSource.transaction(async (em) => {
       const app = await this.lockForUpdate(em, user, id);
       nextStatus(app.status, ApplicationAction.ASSIGN);
+      assertExpectedVersion(app, dto.expectedVersion);
 
       const fromReviewerId = app.assignedReviewerId;
       app.assignedReviewerId = reviewer.id;

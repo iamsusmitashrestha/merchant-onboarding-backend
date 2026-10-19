@@ -34,6 +34,7 @@ export function buildDataSourceOptions(env: DbEnv): DataSourceOptions {
     namingStrategy: new SnakeNamingStrategy(),
     // gen_random_uuid() is built into Postgres 13+, so no uuid-ossp extension is needed.
     uuidExtension: 'pgcrypto',
+    isolateWhereStatements: true,
     synchronize: false,
     migrationsRun: false,
   };
