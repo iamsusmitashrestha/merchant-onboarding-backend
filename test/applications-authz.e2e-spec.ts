@@ -251,6 +251,36 @@ describe('authorization cannot be bypassed', () => {
     });
   });
 
+  describe('users and risk results', () => {
+    it.each<SeedUserKey>(['sales', 'reviewer'])(
+      '%s cannot list users (403)',
+      async (who) => {
+        await request(ctx.http)
+          .get('/users')
+          .set(bearer(tokens[who]))
+          .expect(403);
+      },
+    );
+
+    it('SALES cannot read risk assessments, even for their own application (403)', async () => {
+      const app = await createApplication(ctx.http, tokens.sales);
+
+      await request(ctx.http)
+        .get(`/applications/${app.id}/risk-assessments`)
+        .set(bearer(tokens.sales))
+        .expect(403);
+    });
+
+    it("REVIEWER cannot read a draft's risk assessments (404, same scope as the application)", async () => {
+      const app = await createApplication(ctx.http, tokens.sales);
+
+      await request(ctx.http)
+        .get(`/applications/${app.id}/risk-assessments`)
+        .set(bearer(tokens.reviewer))
+        .expect(404);
+    });
+  });
+
   describe('submit and risk-review retry', () => {
     it("SALES cannot submit another SALES user's application (404), and nothing is queued", async () => {
       const app = await createApplication(ctx.http, tokens.sales2);

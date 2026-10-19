@@ -112,6 +112,26 @@ describe('application lifecycle (e2e)', () => {
     });
   });
 
+  describe('database constraints', () => {
+    it.each([
+      ['a negative amount', 'average_ticket_minor = -1'],
+      ['a malformed MCC', "mcc = '12a4'"],
+      ['a lower-case currency', "currency = 'usd'"],
+    ])(
+      'rejects %s even when written directly to the database',
+      async (_label, set) => {
+        const app = await createApplication(ctx.http, tokens.sales);
+
+        await expect(
+          ctx.dataSource.query(
+            `UPDATE merchant_applications SET ${set} WHERE id = $1`,
+            [app.id],
+          ),
+        ).rejects.toMatchObject({ driverError: { code: '23514' } });
+      },
+    );
+  });
+
   describe('update', () => {
     it('updates while DRAFT and bumps the version', async () => {
       const app = await createApplication(ctx.http, tokens.sales);
@@ -205,6 +225,24 @@ describe('application lifecycle (e2e)', () => {
         status: ApplicationStatus.SUBMITTED,
       });
     }
+
+    it('lets an ADMIN find reviewer ids through GET /users?role=REVIEWER', async () => {
+      const res = await request(ctx.http)
+        .get('/users')
+        .query({ role: 'REVIEWER' })
+        .set(bearer(tokens.admin))
+        .expect(200);
+
+      expect(res.body.map((u: { email: string }) => u.email)).toEqual(
+        [users.reviewer2.email, users.reviewer.email].sort(),
+      );
+      expect(res.body[0]).toEqual({
+        id: expect.any(String),
+        email: expect.any(String),
+        role: 'REVIEWER',
+        active: true,
+      });
+    });
 
     it('assigns an active REVIEWER while SUBMITTED and bumps the version', async () => {
       const app = await submittedApplication();

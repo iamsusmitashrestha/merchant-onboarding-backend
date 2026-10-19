@@ -53,6 +53,22 @@ describe('auth (e2e)', () => {
       expect(unknownEmail.body.message).toBe(wrongPassword.body.message);
     });
 
+    it('throttles repeated attempts for one email from one client (429), without locking out other emails', async () => {
+      const limit = Number(process.env.LOGIN_THROTTLE_LIMIT);
+      const attempt = (email: string) =>
+        request(ctx.http)
+          .post('/auth/login')
+          .send({ email, password: 'not-the-password' });
+
+      for (let i = 0; i < limit; i++) {
+        await attempt('brute-force@example.com').expect(401);
+      }
+      const blocked = await attempt('brute-force@example.com').expect(429);
+      expect(blocked.headers['retry-after']).toBeDefined();
+
+      await attempt('someone-else@example.com').expect(401);
+    });
+
     it('rejects a body with extra fields such as a role', async () => {
       await request(ctx.http)
         .post('/auth/login')

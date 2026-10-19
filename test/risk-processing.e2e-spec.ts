@@ -143,6 +143,33 @@ describe('async risk review (e2e)', () => {
       });
     });
 
+    it('shows reviewers the score and reasons behind the risk level', async () => {
+      const app = await createApplication(ctx.http, tokens.sales, {
+        mcc: '7995',
+      });
+      await submit(app.id).expect(200);
+      await waitForApplication(
+        app.id,
+        (a) => a.status === ApplicationStatus.IN_REVIEW,
+      );
+
+      const res = await request(ctx.http)
+        .get(`/applications/${app.id}/risk-assessments`)
+        .set(bearer(tokens.reviewer))
+        .expect(200);
+
+      expect(res.body).toEqual([
+        {
+          submissionVersion: 1,
+          score: expect.any(Number),
+          level: RiskLevel.HIGH,
+          reasons: ['HIGH_RISK_MCC'],
+          providerReference: expect.stringMatching(/^sim-/),
+          createdAt: expect.any(String),
+        },
+      ]);
+    });
+
     it('rates a gambling MCC as HIGH risk', async () => {
       const app = await createApplication(ctx.http, tokens.sales, {
         mcc: '7995',
